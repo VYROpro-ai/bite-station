@@ -228,6 +228,35 @@
       }
       .manifesto .hl-lime { background: linear-gradient(transparent 62%, var(--lime-bright) 62% 94%, transparent 94%); padding: 0 0.12em; }
       .manifesto .hl-orange { color: var(--orange-deep); }
+      /* ---------- About scroll font animation (this section only) ---------- */
+      .about .script {
+        display: inline-block;
+        opacity: 0; transform: translateY(14px) rotate(-3deg) scale(0.92);
+        transition: opacity 0.6s ease, transform 0.7s cubic-bezier(.2,.9,.3,1.3);
+      }
+      .about.inview .script { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+      .manifesto .w {
+        display: inline-block; opacity: 0.14; transform: translateY(0.34em);
+        filter: blur(2.5px);
+        transition: opacity 0.45s ease, transform 0.55s cubic-bezier(.22,.9,.28,1), filter 0.45s ease;
+        will-change: opacity, transform, filter;
+      }
+      .manifesto .w.on { opacity: 1; transform: translateY(0); filter: blur(0); }
+      .manifesto.js-split .hl-lime { background: none; padding: 0; }
+      .manifesto.js-split .hl-lime .w {
+        background: linear-gradient(transparent 62%, var(--lime-bright) 62% 94%, transparent 94%);
+        padding: 0 0.1em;
+      }
+      .about .btn-ink, .about .feature-chips li, .about .float-photo {
+        transition: opacity 0.65s ease, transform 0.65s cubic-bezier(.22,.9,.28,1);
+      }
+      .about:not(.inview) .btn-ink { transform: translateY(16px); }
+      .about:not(.inview) .feature-chips li { transform: translateY(14px); }
+      .about.inview .feature-chips li:nth-child(1) { transition-delay: 0.08s; }
+      .about.inview .feature-chips li:nth-child(2) { transition-delay: 0.18s; }
+      .about.inview .feature-chips li:nth-child(3) { transition-delay: 0.28s; }
+      .about:not(.inview) .float-l { opacity: 0; transform: translateX(-26px) rotate(-12deg); }
+      .about:not(.inview) .float-r { opacity: 0; transform: translateX(26px) rotate(11deg); }
       .float-photo {
         position: absolute; width: 148px; border: 4px solid #fff; border-radius: 20px; overflow: hidden;
         box-shadow: var(--shadow-pop); z-index: 2;
@@ -485,6 +514,8 @@
         .welcome-line, .welcome-line .wave, .hero h1 .h-line, .hero-fade, .hero-visual, .sticker-price, .sticker-donut { animation: none; }
         .rv { opacity: 1; transform: none; transition: none; }
         .tray-bar, .toast, .drawer { transition: none; }
+        .about .script, .about .btn-ink, .about .feature-chips li, .about .float-photo { opacity: 1 !important; transform: none !important; transition: none !important; }
+        .manifesto .w { opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; }
       }
     </style>
   </head>
@@ -958,6 +989,61 @@
           rvEls.forEach(function (el) { io.observe(el); });
         } else {
           rvEls.forEach(function (el) { el.classList.add("on"); });
+        }
+
+        /* ----- About / manifesto scroll font animation ----- */
+        var manifesto = document.querySelector(".manifesto");
+        var aboutSection = document.getElementById("about");
+        if (manifesto && aboutSection) {
+          var manifestoWords = [];
+          (function splitNode(node) {
+            Array.prototype.slice.call(node.childNodes).forEach(function (child) {
+              if (child.nodeType === 3) {
+                var frag = document.createDocumentFragment();
+                child.textContent.split(/(\s+)/).forEach(function (part) {
+                  if (!part) return;
+                  if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(" ")); }
+                  else {
+                    var s = document.createElement("span");
+                    s.className = "w";
+                    s.textContent = part;
+                    frag.appendChild(s);
+                    manifestoWords.push(s);
+                  }
+                });
+                node.replaceChild(frag, child);
+              } else if (child.nodeType === 1) { splitNode(child); }
+            });
+          })(manifesto);
+          manifesto.classList.add("js-split");
+          var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          if (reduceMotion || !("requestAnimationFrame" in window)) {
+            manifestoWords.forEach(function (w) { w.classList.add("on"); });
+            aboutSection.classList.add("inview");
+          } else {
+            var ticking = false;
+            var updateManifesto = function () {
+              ticking = false;
+              var rect = manifesto.getBoundingClientRect();
+              var vh = window.innerHeight || document.documentElement.clientHeight;
+              var start = vh * 0.88;
+              var end = vh * 0.34;
+              var progress = (start - rect.top) / (start - end);
+              progress = Math.max(0, Math.min(1, progress));
+              if (rect.bottom < vh * 0.42) progress = 1;
+              var count = Math.round(progress * manifestoWords.length);
+              manifestoWords.forEach(function (w, i) { w.classList.toggle("on", i < count); });
+              if (rect.top < vh * 0.86) aboutSection.classList.add("inview");
+              else aboutSection.classList.remove("inview");
+            };
+            var requestUpdate = function () {
+              if (!ticking) { ticking = true; window.requestAnimationFrame(updateManifesto); }
+            };
+            window.addEventListener("scroll", requestUpdate, { passive: true });
+            window.addEventListener("resize", requestUpdate);
+            updateManifesto();
+            setTimeout(updateManifesto, 120);
+          }
         }
 
         /* ----- Menu filter ----- */
